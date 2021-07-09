@@ -79,8 +79,14 @@ class ODENVP(nn.Module):
             if key[0] == "0":
                 final_state_dict [key] = self.transforms.state_dict()[key]
             else:
-                final_state_dict[key] = loaded_state_dict[key]
+                try:
+                    final_state_dict[key] = loaded_state_dict[key]
+                except:
+                    continue
 
+        for key in self.transforms.state_dict().keys():
+            if key not in final_state_dict.keys():
+                final_state_dict[key] = self.transforms.state_dict()[key]
         self.transforms.load_state_dict(final_state_dict)
 
     def _build_net_complete(self, input_size):
@@ -113,8 +119,7 @@ class ODENVP(nn.Module):
                     strides=self.strides,
                     idims=self.intermediate_dims,
                     squeeze=(i < self.n_scale - 1),  # don't squeeze last layer
-                    init_layer=(layers.LogitTransform(self.alpha) if self.alpha > 0 else layers.ZeroMeanTransform())
-                    if self.squash_input and i == 0 else None,
+                    init_layer=None,
                     n_blocks=self.n_blocks,
                     cnf_kwargs=self.cnf_kwargs,
                     nonlinearity=self.nonlinearity,
@@ -203,7 +208,7 @@ class ODENVP(nn.Module):
                 # last layer, no factor out
                 factor_out1 = x1
                 factor_out2 = x2
-            _=0
+
             out.append(torch.cat((factor_out1 ,factor_out2), 1))
         out = [o.view(o.size()[0], -1) for o in out]
         out = torch.cat(out, 1)

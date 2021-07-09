@@ -59,8 +59,6 @@ class SigmoidTransform(nn.Module):
 
 
 def _logit(x, logpx=None, alpha=_DEFAULT_ALPHA):
-    if (x < 0).any():
-        print("negative values detected")
     s = alpha + (1 - 2 * alpha) * x
     y = torch.log(s) - torch.log(1 - s)
     if logpx is None:
