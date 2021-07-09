@@ -65,7 +65,7 @@ class ODENVP(nn.Module):
 
     def _load_weights(self):
         state_dict = torch.load(
-            "/home/kinaan/PycharmProjects/ffjord-rnode/experiments/celebahq/example/32_simple_experiment/best.pth")["state_dict"]
+            "/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example/32_simple_experiment/best.pth")["state_dict"]
 
         skip_index = len("transforms.")
         loaded_state_dict = {}

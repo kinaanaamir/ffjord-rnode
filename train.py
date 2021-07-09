@@ -189,12 +189,12 @@ def get_dataset(args):
     elif args.data == 'celebahq':
         im_dim = 3
         im_size = 64 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/training/", transform=tforms.Compose([
+        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/", transform=tforms.Compose([
             tforms.Resize(im_size),
             tforms.RandomHorizontalFlip(),
         ])
                              )
-        test_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/test/", transform=tforms.Compose([
+        test_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/test/", transform=tforms.Compose([
             tforms.Resize(im_size),
         ])
                             )
@@ -250,7 +250,7 @@ def get_dataset(args):
                      else None)
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_set, batch_size=2,  # shuffle=True,
+        dataset=train_set, batch_size=args.batch_size,  # shuffle=True,
         num_workers=8, pin_memory=True, collate_fn=fast_collate
     )
 
@@ -260,7 +260,7 @@ def get_dataset(args):
                     else None)
 
     test_loader = torch.utils.data.DataLoader(
-        dataset=test_set, batch_size=2,  # shuffle=False,
+        dataset=test_set, batch_size=args.batch_size,  # shuffle=False,
         num_workers=8, pin_memory=True, collate_fn=fast_collate
     )
 
