@@ -30,15 +30,20 @@ class ODENVP(nn.Module):
             zero_last=True,
             div_samples=1,
             alpha=0.05,
-            cnf_kwargs=None,
+            cnf_kwargs=None, reduce_dim_first=False
     ):
         super(ODENVP, self).__init__()
         if squeeze_first:
             bsz, c, w, h = input_size
             c, w, h = c * 4, w // 2, h // 2
             input_size = bsz, c, w, h
-
-        self.n_scale = min(n_scale, self._calc_n_scale(input_size))
+        if reduce_dim_first:
+            bsz, c, w, h = input_size
+            _, w, h = c * 4, w // 2, h // 2
+            reduced_input = bsz, c, w, h
+            self.n_scale = min(n_scale, self._calc_n_scale(reduced_input))
+        else:
+            self.n_scale = min(n_scale, self._calc_n_scale(input_size))
         self.n_blocks = n_blocks
         self.intermediate_dims = intermediate_dims
         self.layer_type = layer_type
@@ -54,9 +59,69 @@ class ODENVP(nn.Module):
         if not self.n_scale > 0:
             raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
-        self.transforms = self._build_net(input_size)
-
+        self.transforms = self._build_net_complete(input_size)
+        self._load_weights()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
+
+    def _load_weights(self):
+        state_dict = torch.load(
+            "/home/kinaan/PycharmProjects/ffjord-rnode/experiments/celebahq/example/32_simple_experiment/best.pth",
+            map_location=torch.device('cpu'))[
+            "state_dict"]
+
+        skip_index = len("transforms.")
+        loaded_state_dict = {}
+        for key in state_dict.keys():
+            number = str(int(key[skip_index]) + 1)
+            loaded_state_dict[number + key[skip_index + 1:]] = state_dict[key]
+        final_state_dict = {}
+        for key in self.transforms.state_dict().keys():
+            if key[0] == "0":
+                final_state_dict [key] = self.transforms.state_dict()[key]
+            else:
+                final_state_dict[key] = loaded_state_dict[key]
+
+        self.transforms.load_state_dict(final_state_dict)
+
+    def _build_net_complete(self, input_size):
+        bsz, c, h, w = input_size
+        transforms = []
+        transforms.append(
+            StackedCNFLayers(
+                initial_size=(c, h, w),
+                div_samples=self.div_samples,
+                zero_last=self.zero_last,
+                layer_type=self.layer_type,
+                strides=self.strides,
+                idims=self.intermediate_dims,
+                squeeze=(0 < self.n_scale - 1),  # don't squeeze last layer
+                init_layer=(layers.LogitTransform(self.alpha) if self.alpha > 0 else layers.ZeroMeanTransform())
+                if self.squash_input else None,
+                n_blocks=self.n_blocks,
+                cnf_kwargs=self.cnf_kwargs,
+                nonlinearity=self.nonlinearity,
+            )
+        )
+        c, h, w = c, h // 2, w // 2
+        for i in range(self.n_scale):
+            transforms.append(
+                StackedCNFLayers(
+                    initial_size=(c, h, w),
+                    div_samples=self.div_samples,
+                    zero_last=self.zero_last,
+                    layer_type=self.layer_type,
+                    strides=self.strides,
+                    idims=self.intermediate_dims,
+                    squeeze=(i < self.n_scale - 1),  # don't squeeze last layer
+                    init_layer=(layers.LogitTransform(self.alpha) if self.alpha > 0 else layers.ZeroMeanTransform())
+                    if self.squash_input and i == 0 else None,
+                    n_blocks=self.n_blocks,
+                    cnf_kwargs=self.cnf_kwargs,
+                    nonlinearity=self.nonlinearity,
+                )
+            )
+            c, h, w = c * 2, h // 2, w // 2
+        return nn.ModuleList(transforms)
 
     def _build_net(self, input_size):
         _, c, h, w = input_size
@@ -118,16 +183,28 @@ class ODENVP(nn.Module):
 
     def _logdensity(self, x, logpx=None, reg_states=tuple()):
         _logpx = torch.zeros(x.shape[0], 1).to(x) if logpx is None else logpx
-        out = []
-        for idx in range(len(self.transforms)):
-            x, _logpx, reg_states = self.transforms[idx].forward(x, _logpx, reg_states)
+        x, _logpx, reg_states = self.transforms[0].forward(x, _logpx, reg_states)
+        d = x.size(1) // 2
+        x, factor_out = x[:, :d], x[:, d:]
+        out = [factor_out]
+        d = x.size(1) // 2
+        x1, x2 = x[:, :d] , x[:, d:]
+        for idx in range(1, len(self.transforms)):
+
+            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx/2, reg_states)
+            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx/2, reg_states)
+            _=0
             if idx < len(self.transforms) - 1:
-                d = x.size(1) // 2
-                x, factor_out = x[:, :d], x[:, d:]
+                d = x1.size(1) // 2
+                x1, factor_out1 = x1[:, :d], x1[:, d:]
+                d = x2.size(1) // 2
+                x2, factor_out2 = x2[:, :d], x2[:, d:]
             else:
                 # last layer, no factor out
-                factor_out = x
-            out.append(factor_out)
+                factor_out1 = x1
+                factor_out2 = x2
+            _=0
+            out.append(torch.cat((factor_out1 ,factor_out2), 1))
         out = [o.view(o.size()[0], -1) for o in out]
         out = torch.cat(out, 1)
         return out, _logpx, reg_states

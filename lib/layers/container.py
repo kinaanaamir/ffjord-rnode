@@ -15,7 +15,11 @@ class SequentialFlow(nn.Module):
                 inds = range(len(self.chain) - 1, -1, -1)
             else:
                 inds = range(len(self.chain))
-
+        print(logpx)
+        if (x < 0).any():
+            print("negative values detected")
         for i in inds:
+
             x, logpx, reg_states = self.chain[i](x, logpx, reg_states, reverse=reverse)
+            print(logpx)
         return x, logpx, reg_states

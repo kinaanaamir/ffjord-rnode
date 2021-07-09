@@ -188,13 +188,13 @@ def get_dataset(args):
         test_set = dset.CIFAR10(root=args.datadir, train=False, transform=None, download=True)
     elif args.data == 'celebahq':
         im_dim = 3
-        im_size = 32 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/", transform=tforms.Compose([
+        im_size = 64 if args.imagesize is None else args.imagesize
+        train_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/training/", transform=tforms.Compose([
             tforms.Resize(im_size),
             tforms.RandomHorizontalFlip(),
         ])
                              )
-        test_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/test/", transform=tforms.Compose([
+        test_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/test/", transform=tforms.Compose([
             tforms.Resize(im_size),
         ])
                             )
@@ -250,7 +250,7 @@ def get_dataset(args):
                      else None)
 
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_set, batch_size=args.batch_size,  # shuffle=True,
+        dataset=train_set, batch_size=2,  # shuffle=True,
         num_workers=8, pin_memory=True, collate_fn=fast_collate
     )
 
@@ -260,7 +260,7 @@ def get_dataset(args):
                     else None)
 
     test_loader = torch.utils.data.DataLoader(
-        dataset=test_set, batch_size=args.test_batch_size,  # shuffle=False,
+        dataset=test_set, batch_size=2,  # shuffle=False,
         num_workers=8, pin_memory=True, collate_fn=fast_collate
     )
 
@@ -299,6 +299,7 @@ def create_model(args, data_shape, regularization_fns):
         zero_last=args.zero_last,
         alpha=args.alpha,
         cnf_kwargs={"T": args.time_length, "train_T": args.train_T, "regularization_fns": regularization_fns},
+        reduce_dim_first=True
     )
 
     return model
@@ -341,7 +342,8 @@ def main():
 
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
-    model = create_model(args, data_shape, regularization_fns).cuda()
+    #model = create_model(args, data_shape, regularization_fns).cuda()
+    model = create_model(args, data_shape, regularization_fns)
     args.distributed = False
     if args.distributed: model = dist_utils.DDP(model,
                                                 device_ids=["cuda:%d" % torch.cuda.current_device()],
