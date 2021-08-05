@@ -72,12 +72,12 @@ def get_parser():
     parser.add_argument('--train_T', type=eval, default=False)
 
     parser.add_argument("--num_epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument(
         "--batch_size_schedule", type=str, default="",
         help="Increases the batchsize at every given epoch, dash separated."
     )
-    parser.add_argument("--test_batch_size", type=int, default=200)
+    parser.add_argument("--test_batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--warmup_iters", type=float, default=1000)
     parser.add_argument("--weight_decay", type=float, default=0.)
