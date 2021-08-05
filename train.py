@@ -328,6 +328,8 @@ def main():
         if write_log: logger.info("Distributed: success (%d/%d)" % (args.local_rank, distributed.get_world_size()))
 
     # get deivce
+    args.batch_size = 8
+    args.test_batch_size = 8
     device = torch.device("cuda:%d" % torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
     cvt = lambda x: x.type(torch.float32).to(device, non_blocking=True)
 
