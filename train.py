@@ -267,10 +267,10 @@ def get_dataset(args):
     return train_loader, test_loader, data_shape
 
 
-def compute_bits_per_dim(x, model):
+def compute_bits_per_dim(x, sharing_factor, model):
     zero = torch.zeros(x.shape[0], 1).to(x)
 
-    z, delta_logp, reg_states = model(x, zero)  # run model forward
+    z, delta_logp, reg_states = model(x, sharing_factor, zero)  # run model forward
 
     reg_states = tuple(torch.mean(rs) for rs in reg_states)
 
@@ -343,7 +343,7 @@ def main():
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
     model = create_model(args, data_shape, regularization_fns).cuda()
-    #model = create_model(args, data_shape, regularization_fns)
+    # model = create_model(args, data_shape, regularization_fns)
     args.distributed = False
     if args.distributed: model = dist_utils.DDP(model,
                                                 device_ids=["cuda:%d" % torch.cuda.current_device()],
@@ -414,6 +414,7 @@ def main():
         if write_log: logger.info('Syncing machines before training')
         dist_utils.sum_tensor(torch.tensor([1.0]).float().cuda())
 
+    sharing_factors = np.hstack((np.array([0.001, 0.001, 0.001, 0.001]), np.linspace(0.001, 1, 10)))
     length_of_trainloader = len(train_loader.dataset)
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
@@ -425,6 +426,9 @@ def main():
                 number_of_batches = length_of_trainloader // train_loader.batch_size
                 for i in range(number_of_batches):
                     x, label = next(iter(train_loader))
+                    sharing_factor = 1.0
+                    if epoch < sharing_factors.shape[0]:
+                        sharing_factor = sharing_factors[epoch]
                     start = time.time()
                     update_lr(optimizer, itr)
                     optimizer.zero_grad()
@@ -433,7 +437,7 @@ def main():
                     x = add_noise(cvt(x), nbits=args.nbits)
                     # x = x.clamp_(min=0, max=1)
                     # compute loss
-                    bpd, (x, z), reg_states = compute_bits_per_dim(x, model)
+                    bpd, (x, z), reg_states = compute_bits_per_dim(x, sharing_factor, model)
                     if np.isnan(bpd.data.item()):
                         raise ValueError('model returned nan during training')
                     elif np.isinf(bpd.data.item()):

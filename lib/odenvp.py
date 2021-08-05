@@ -3,6 +3,7 @@ import torch.nn as nn
 import lib.layers as layers
 from lib.layers.odefunc import ODEnet
 from lib.layers.squeeze import squeeze, unsqueeze
+import torchvision.transforms as tforms
 import numpy as np
 
 
@@ -55,7 +56,7 @@ class ODENVP(nn.Module):
         self.alpha = alpha
         self.squeeze_first = squeeze_first
         self.cnf_kwargs = cnf_kwargs if cnf_kwargs else {}
-
+        self.transforms_2 = tforms.Compose([tforms.Resize(32)])
         if not self.n_scale > 0:
             raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
@@ -75,7 +76,7 @@ class ODENVP(nn.Module):
         final_state_dict = {}
         for key in self.transforms.state_dict().keys():
             if key[0] == "0":
-                final_state_dict [key] = self.transforms.state_dict()[key]
+                final_state_dict[key] = self.transforms.state_dict()[key]
             else:
                 try:
                     final_state_dict[key] = loaded_state_dict[key]
@@ -171,7 +172,7 @@ class ODENVP(nn.Module):
                 output_sizes.append((n, c, h, w))
         return tuple(output_sizes)
 
-    def forward(self, x, logpx=None, reg_states=tuple(), reverse=False):
+    def forward(self, x, sharing_factor, logpx=None, reg_states=tuple(), reverse=False):
         if reverse:
             out = self._generate(x, logpx, reg_states)
             if self.squeeze_first:
@@ -182,21 +183,24 @@ class ODENVP(nn.Module):
         else:
             if self.squeeze_first:
                 x = squeeze(x)
-            return self._logdensity(x, logpx, reg_states)
+            return self._logdensity(x, sharing_factor, logpx, reg_states)
 
-    def _logdensity(self, x, logpx=None, reg_states=tuple()):
+    def _logdensity(self, x, sharing_factor, logpx=None, reg_states=tuple()):
         _logpx = torch.zeros(x.shape[0], 1).to(x) if logpx is None else logpx
+        image_2 = self.transforms_2(x)
         x, _logpx, reg_states = self.transforms[0].forward(x, _logpx, reg_states)
         d = x.size(1) // 2
         x, factor_out = x[:, :d], x[:, d:]
         out = [factor_out]
         d = x.size(1) // 2
-        x1, x2 = x[:, :d] , x[:, d:]
+        x1, x2 = x[:, :d], x[:, d:]
+        x1 = x1 * sharing_factor + image_2 * (1 - sharing_factor)
+        x2 = x2 * sharing_factor + image_2 * (1 - sharing_factor)
         for idx in range(1, len(self.transforms)):
 
-            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx/2, reg_states)
-            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx/2, reg_states)
-            _=0
+            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx / 2, reg_states)
+            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx / 2, reg_states)
+            _ = 0
             if idx < len(self.transforms) - 1:
                 d = x1.size(1) // 2
                 x1, factor_out1 = x1[:, :d], x1[:, d:]
@@ -207,7 +211,7 @@ class ODENVP(nn.Module):
                 factor_out1 = x1
                 factor_out2 = x2
 
-            out.append(torch.cat((factor_out1 ,factor_out2), 1))
+            out.append(torch.cat((factor_out1, factor_out2), 1))
         out = [o.view(o.size()[0], -1) for o in out]
         out = torch.cat(out, 1)
         return out, _logpx, reg_states
