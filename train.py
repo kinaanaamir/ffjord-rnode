@@ -446,6 +446,8 @@ def main():
                         raise ValueError('model returned inf during training')
 
                     loss = bpd
+                    if loss <= 0:
+                        loss = 0.0
                     if regularization_coeffs:
                         reg_loss = sum(
                             reg_state * coeff for reg_state, coeff in zip(reg_states, regularization_coeffs) if
