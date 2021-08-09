@@ -415,7 +415,7 @@ def main():
         dist_utils.sum_tensor(torch.tensor([1.0]).float().cuda())
 
     # sharing_factors = np.hstack((np.array([0.001, 0.001, 0.001, 0.001]), np.linspace(0.001, 1, 10)))
-    sharing_factors = np.linspace(0.0, 1, 10)
+    sharing_factors = np.linspace(0.01, 1, 10)
     length_of_trainloader = len(train_loader.dataset)
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
