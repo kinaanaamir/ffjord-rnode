@@ -196,10 +196,12 @@ class ODENVP(nn.Module):
         x1, x2 = x[:, :d], x[:, d:]
         x1 = x1 * sharing_factor + image_2 * (1 - sharing_factor)
         x2 = x2 * sharing_factor + image_2 * (1 - sharing_factor)
+        _logpx1 = _logpx
+        _logpx2 = _logpx
         for idx in range(1, len(self.transforms)):
 
-            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx / 2, reg_states)
-            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx / 2, reg_states)
+            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx, reg_states)
+            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx, reg_states)
             _ = 0
             if idx < len(self.transforms) - 1:
                 d = x1.size(1) // 2
@@ -214,7 +216,7 @@ class ODENVP(nn.Module):
             out.append(torch.cat((factor_out1, factor_out2), 1))
         out = [o.view(o.size()[0], -1) for o in out]
         out = torch.cat(out, 1)
-        return out, _logpx, reg_states
+        return out, _logpx1 + _logpx2, reg_states
 
     def _generate(self, z, logpz=None, reg_states=tuple()):
         z = z.view(z.shape[0], -1)
