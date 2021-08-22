@@ -202,9 +202,8 @@ class ODENVP(nn.Module):
         reg_states2 = reg_states
         for idx in range(1, len(self.transforms)):
 
-            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx, reg_states1)
-            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx, reg_states2)
-            _ = 0
+            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx1, reg_states1)
+            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx2, reg_states2)
             if idx < len(self.transforms) - 1:
                 d = x1.size(1) // 2
                 x1, factor_out1 = x1[:, :d], x1[:, d:]
