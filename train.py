@@ -283,7 +283,7 @@ def compute_bits_per_dim(x, sharing_factor, model):
     check = False
     if (logpx_per_dim - np.log(nvals)) > 0:
         check = True
-    bits_per_dim = -(np.min(0, logpx_per_dim - np.log(nvals))) / np.log(2)
+    bits_per_dim = -(torch.min(torch.zeros(1), logpx_per_dim - np.log(nvals))) / np.log(2)
 
     return bits_per_dim, (x, z), reg_states, check
 
