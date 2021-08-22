@@ -189,14 +189,16 @@ def get_dataset(args):
     elif args.data == 'celebahq':
         im_dim = 3
         im_size = 64 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/", transform=tforms.Compose([
-            tforms.Resize(im_size),
-            tforms.RandomHorizontalFlip(),
-        ])
+        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/",
+                             transform=tforms.Compose([
+                                 tforms.Resize(im_size),
+                                 tforms.RandomHorizontalFlip(),
+                             ])
                              )
-        test_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/test/", transform=tforms.Compose([
-            tforms.Resize(im_size),
-        ])
+        test_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/test/",
+                            transform=tforms.Compose([
+                                tforms.Resize(im_size),
+                            ])
                             )
     elif args.data == 'imagenet64':
         im_dim = 3
@@ -278,9 +280,12 @@ def compute_bits_per_dim(x, sharing_factor, model):
     logpx = logpz - delta_logp
 
     logpx_per_dim = torch.sum(logpx) / x.nelement()  # averaged over batches
-    bits_per_dim = -(logpx_per_dim - np.log(nvals)) / np.log(2)
+    check = False
+    if (logpx_per_dim - np.log(nvals)) > 0:
+        check = True
+    bits_per_dim = -(np.min(0, logpx_per_dim - np.log(nvals))) / np.log(2)
 
-    return bits_per_dim, (x, z), reg_states
+    return bits_per_dim, (x, z), reg_states, check
 
 
 def create_model(args, data_shape, regularization_fns):
@@ -342,7 +347,7 @@ def main():
 
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
-    model = create_model(args, data_shape, regularization_fns).cuda()
+    model = create_model(args, data_shape, regularization_fns)  # .cuda()
     # model = create_model(args, data_shape, regularization_fns)
     args.distributed = False
     if args.distributed: model = dist_utils.DDP(model,
@@ -417,6 +422,7 @@ def main():
     # sharing_factors = np.hstack((np.array([0.001, 0.001, 0.001, 0.001]), np.linspace(0.001, 1, 10)))
     sharing_factors = np.linspace(0.01, 1, 10)
     length_of_trainloader = len(train_loader.dataset)
+    sharing_factor_iterator = 0
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()
@@ -429,7 +435,7 @@ def main():
                     x, label = next(iter(train_loader))
                     sharing_factor = 1.0
                     if epoch < sharing_factors.shape[0]:
-                        sharing_factor = sharing_factors[epoch]
+                        sharing_factor = sharing_factors[sharing_factor_iterator]
                     start = time.time()
                     update_lr(optimizer, itr)
                     optimizer.zero_grad()
@@ -438,7 +444,11 @@ def main():
                     x = add_noise(cvt(x), nbits=args.nbits)
                     # x = x.clamp_(min=0, max=1)
                     # compute loss
-                    bpd, (x, z), reg_states = compute_bits_per_dim(x, sharing_factor, model)
+                    bpd, (x, z), reg_states, check = compute_bits_per_dim(x, sharing_factor, model)
+                    if check:
+                        if sharing_factor_iterator < sharing_factors.shape[0]:
+                            sharing_factor_iterator += 1
+
                     if np.isnan(bpd.data.item()):
                         raise ValueError('model returned nan during training')
                     elif np.isinf(bpd.data.item()):
@@ -523,7 +533,7 @@ def main():
                             logger.info(log_message)
 
                     itr += 1
-
+        sharing_factor_iterator += 1
         # compute test loss
         model.eval()
         if args.local_rank == 0:
@@ -548,7 +558,7 @@ def main():
                     for i, (x, y) in enumerate(test_loader):
                         sh = x.shape
                         x = shift(cvt(x), nbits=args.nbits)
-                        loss, (x, z), _ = compute_bits_per_dim(x, model)
+                        loss, (x, z), _, _ = compute_bits_per_dim(x, model)
                         dist = (x.view(x.size(0), -1) - z).pow(2).mean(dim=-1).mean()
                         meandist = i / (i + 1) * dist + meandist / (i + 1)
                         lossmean = i / (i + 1) * lossmean + loss / (i + 1)
