@@ -347,7 +347,7 @@ def main():
 
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
-    model = create_model(args, data_shape, regularization_fns)  # .cuda()
+    model = create_model(args, data_shape, regularization_fns).cuda()
     # model = create_model(args, data_shape, regularization_fns)
     args.distributed = False
     if args.distributed: model = dist_utils.DDP(model,
