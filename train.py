@@ -443,7 +443,7 @@ def main():
                         if sharing_factor_iterator < sharing_factors.shape[0]:
                             sharing_factor_iterator += 1
                             sharing_factor = sharing_factors[sharing_factor_iterator]
-
+                            print("\n\n\nIncreased sharing factor to : ", sharing_factor, "\n\n\n")
                     # cast data and move to device
                     x = add_noise(cvt(x), nbits=args.nbits)
                     # x = x.clamp_(min=0, max=1)
