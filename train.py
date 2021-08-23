@@ -439,6 +439,10 @@ def main():
                     start = time.time()
                     update_lr(optimizer, itr)
                     optimizer.zero_grad()
+                    if itr % 100 == 0 and itr > 0:
+                        if sharing_factor_iterator < sharing_factors.shape[0]:
+                            sharing_factor_iterator += 1
+                            sharing_factor = sharing_factors[sharing_factor_iterator]
 
                     # cast data and move to device
                     x = add_noise(cvt(x), nbits=args.nbits)
