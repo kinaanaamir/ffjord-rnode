@@ -439,16 +439,16 @@ def main():
                     start = time.time()
                     update_lr(optimizer, itr)
                     optimizer.zero_grad()
-                    if itr % 100 == 0 and itr > 0:
-                        if sharing_factor_iterator < sharing_factors.shape[0]:
-                            sharing_factor_iterator += 1
-                            sharing_factor = sharing_factors[sharing_factor_iterator]
-                            print("\n\n\nIncreased sharing factor to : ", sharing_factor, "\n\n\n")
+                    # if itr % 100 == 0 and itr > 0:
+                    #     if sharing_factor_iterator < sharing_factors.shape[0]:
+                    #         sharing_factor_iterator += 1
+                    #         sharing_factor = sharing_factors[sharing_factor_iterator]
+                    #         print("\n\n\nIncreased sharing factor to : ", sharing_factor, "\n\n\n")
                     # cast data and move to device
                     x = add_noise(cvt(x), nbits=args.nbits)
                     # x = x.clamp_(min=0, max=1)
                     # compute loss
-                    bpd, (x, z), reg_states, check = compute_bits_per_dim(x, sharing_factor, model)
+                    bpd, (x, z), reg_states, check = compute_bits_per_dim(x, 1, model)
                     if check:
                         if sharing_factor_iterator < sharing_factors.shape[0]:
                             sharing_factor_iterator += 1
