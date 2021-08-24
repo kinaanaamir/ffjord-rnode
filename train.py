@@ -562,7 +562,7 @@ def main():
                     for i, (x, y) in enumerate(test_loader):
                         sh = x.shape
                         x = shift(cvt(x), nbits=args.nbits)
-                        loss, (x, z), _, _ = compute_bits_per_dim(x, sharing_factor, model)
+                        loss, (x, z), _, _ = compute_bits_per_dim(x, 1, model)
                         dist = (x.view(x.size(0), -1) - z).pow(2).mean(dim=-1).mean()
                         meandist = i / (i + 1) * dist + meandist / (i + 1)
                         lossmean = i / (i + 1) * lossmean + loss / (i + 1)
