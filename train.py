@@ -421,6 +421,7 @@ def main():
 
     # sharing_factors = np.hstack((np.array([0.001, 0.001, 0.001, 0.001]), np.linspace(0.001, 1, 10)))
     sharing_factors = np.linspace(0.01, 1, 10)
+
     length_of_trainloader = len(train_loader.dataset)
     sharing_factor_iterator = 0
     for epoch in range(begin_epoch, args.num_epochs + 1):
@@ -473,6 +474,14 @@ def main():
                     nfe_opt = count_nfe(model)
                     if write_log: steps_meter.update(nfe_opt)
                     grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+                    if itr == 900 and args.local_rank == 0:
+                        utils.makedirs(args.save)
+                        torch.save({
+                            "args": args,
+                            "state_dict": model.state_dict() if torch.cuda.is_available() else model.state_dict(),
+                            "optim_state_dict": optimizer.state_dict(),
+                            "fixed_z": fixed_z.cpu()
+                        }, os.path.join(args.save, "intermediate.pth"))
 
                     optimizer.step()
 

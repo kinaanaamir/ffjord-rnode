@@ -10,8 +10,8 @@ def standard_normal_logprob(z):
     logZ = -0.5 * math.log(2 * math.pi)
     return logZ - z.pow(2) / 2
 
-def set_step_size(step_size, model):
 
+def set_step_size(step_size, model):
     def _set(module):
         if isinstance(module, layers.CNF):
             # Set training settings
@@ -21,7 +21,6 @@ def set_step_size(step_size, model):
 
 
 def set_cnf_options(args, model):
-
     def _set(module):
         if isinstance(module, layers.CNF):
             # Set training settings
@@ -46,12 +45,10 @@ def set_cnf_options(args, model):
             if args.test_first_step is not None:
                 module.test_solver_options['first_step'] = args.test_first_step
 
-
     model.apply(_set)
 
 
 def override_divergence_fn(model, divergence_fn):
-
     def _set(module):
         if isinstance(module, layers.ODEfunc):
             if divergence_fn == "brute_force":
@@ -63,7 +60,6 @@ def override_divergence_fn(model, divergence_fn):
 
 
 def count_nfe(model):
-
     class AccNumEvals(object):
 
         def __init__(self):
@@ -83,7 +79,6 @@ def count_parameters(model):
 
 
 def count_total_time(model):
-
     class Accumulator(object):
 
         def __init__(self):
@@ -96,7 +91,6 @@ def count_total_time(model):
     accumulator = Accumulator()
     model.apply(accumulator)
     return accumulator.total_time
-
 
 
 REGULARIZATION_FNS = {
@@ -114,10 +108,12 @@ def append_regularization_to_log(log_message, regularization_fns, reg_states):
         log_message = log_message + " | " + INV_REGULARIZATION_FNS[reg_fn] + ": {:.2e}".format(reg_states[i].item())
     return log_message
 
+
 def append_regularization_keys_header(header, regularization_fns):
     for reg_fn in regularization_fns:
         header.append(INV_REGULARIZATION_FNS[reg_fn])
     return header
+
 
 def append_regularization_csv_dict(d, regularization_fns, reg_states):
     for i, reg_fn in enumerate(regularization_fns):
@@ -151,5 +147,3 @@ def get_regularization(model, regularization_coeffs):
             acc_reg_states = tuple(acc_reg_states[i] + reg[i] for i in range(len(reg)))
 
     return acc_reg_states
-
-
