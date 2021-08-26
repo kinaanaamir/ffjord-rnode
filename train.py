@@ -334,6 +334,7 @@ def main():
 
     # get deivce
     device = torch.device("cuda:%d" % torch.cuda.current_device() if torch.cuda.is_available() else "cpu")
+    # device = "cpu"
     cvt = lambda x: x.type(torch.float32).to(device, non_blocking=True)
 
     # load dataset

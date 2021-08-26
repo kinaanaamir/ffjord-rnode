@@ -62,7 +62,18 @@ class ODENVP(nn.Module):
 
         self.transforms = self._build_net_complete(input_size)
         # self._load_weights()
+        self._load_complete_state_dict()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
+
+    def _load_complete_state_dict(self):
+        state_dict = torch.load(
+            "/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example/intermediate.pth")["state_dict"]
+        skip_index = len("transforms.")
+        loaded_state_dict = {}
+        for key in state_dict.keys():
+            number = str(int(key[skip_index]))
+            loaded_state_dict[number + key[skip_index + 1:]] = state_dict[key]
+        self.transforms.load_state_dict(loaded_state_dict)
 
     def _load_weights(self):
         state_dict = torch.load(
