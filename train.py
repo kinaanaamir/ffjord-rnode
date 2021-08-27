@@ -425,7 +425,6 @@ def main():
 
     length_of_trainloader = len(train_loader.dataset)
     sharing_factor_iterator = 0
-    args.validate = True
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()
