@@ -313,7 +313,7 @@ def create_model(args, data_shape, regularization_fns):
 # if __name__ == "__main__":
 def main():
     # os.system('shutdown -c')  # cancel previous shutdown command
-
+    print(os.environ.get("MASTER_PORT", None))
     if write_log:
         utils.makedirs(args.save)
         logger = utils.get_logger(logpath=os.path.join(args.save, 'logs'), filepath=os.path.abspath(__file__))
