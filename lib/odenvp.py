@@ -230,7 +230,8 @@ class ODENVP(nn.Module):
         out = torch.cat(out, 1)
         print(reg_states1)
         print(reg_states2)
-
+        if len(reg_states1) == 0 or len(reg_states2) == 0:
+            return out, (_logpx1 + _logpx2) / 2.0, ()
         return out, (_logpx1 + _logpx2) / 2.0, ((reg_states1[0] + reg_states2[0]) / 2.0,
                                                 (reg_states1[1] + reg_states2[1]) / 2.0)
 
