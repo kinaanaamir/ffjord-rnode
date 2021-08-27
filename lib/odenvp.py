@@ -228,6 +228,9 @@ class ODENVP(nn.Module):
             out.append(torch.cat((factor_out1, factor_out2), 1))
         out = [o.view(o.size()[0], -1) for o in out]
         out = torch.cat(out, 1)
+        print(reg_states1)
+        print(reg_states2)
+
         return out, (_logpx1 + _logpx2) / 2.0, ((reg_states1[0] + reg_states2[0]) / 2.0,
                                                 (reg_states1[1] + reg_states2[1]) / 2.0)
 
