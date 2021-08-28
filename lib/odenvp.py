@@ -233,7 +233,6 @@ class ODENVP(nn.Module):
         return out, (_logpx1 + _logpx2) / 2.0, ((reg_states1[0] + reg_states2[0]) / 2.0,
                                                 (reg_states1[1] + reg_states2[1]) / 2.0)
 
-
     def _generate(self, z, logpz=None, reg_states=tuple()):
         z = z.view(z.shape[0], -1)
         zs = []
