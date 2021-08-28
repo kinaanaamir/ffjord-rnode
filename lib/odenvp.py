@@ -234,21 +234,21 @@ class ODENVP(nn.Module):
                                                 (reg_states1[1] + reg_states2[1]) / 2.0)
 
 
-def _generate(self, z, logpz=None, reg_states=tuple()):
-    z = z.view(z.shape[0], -1)
-    zs = []
-    i = 0
-    for dims in self.dims:
-        s = np.prod(dims)
-        zs.append(z[:, i:i + s])
-        i += s
-    zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)]
-    _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
-    z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
-    for idx in range(len(self.transforms) - 2, -1, -1):
-        z_prev = torch.cat((z_prev, zs[idx]), dim=1)
-        z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
-    return z_prev, _logpz, reg_states
+    def _generate(self, z, logpz=None, reg_states=tuple()):
+        z = z.view(z.shape[0], -1)
+        zs = []
+        i = 0
+        for dims in self.dims:
+            s = np.prod(dims)
+            zs.append(z[:, i:i + s])
+            i += s
+        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)]
+        _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
+        z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
+        for idx in range(len(self.transforms) - 2, -1, -1):
+            z_prev = torch.cat((z_prev, zs[idx]), dim=1)
+            z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
+        return z_prev, _logpz, reg_states
 
 
 class StackedCNFLayers(layers.SequentialFlow):
