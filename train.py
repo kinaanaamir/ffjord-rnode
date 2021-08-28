@@ -614,7 +614,7 @@ def main():
                 with torch.no_grad():
                     fig_filename = os.path.join(args.save, "figs", "{:04d}.jpg".format(epoch))
                     utils.makedirs(os.path.dirname(fig_filename))
-                    generated_samples, _, _ = model(fixed_z, reverse=True)
+                    generated_samples, _, _ = model(fixed_z, 1, reverse=True)
                     generated_samples = generated_samples.view(-1, *data_shape)
                     nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
                     save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
