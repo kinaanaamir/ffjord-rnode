@@ -550,15 +550,6 @@ def main():
         sharing_factor_iterator += 1
         # compute test loss
         model.eval()
-        if write_log:
-            with torch.no_grad():
-                fig_filename = os.path.join("/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example", "figs",
-                                            "{:04d}.jpg".format(epoch))
-                utils.makedirs(os.path.dirname(fig_filename))
-                generated_samples, _, _ = model(fixed_z, 1, reverse=True)
-                generated_samples = generated_samples.view(-1, *data_shape)
-                nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
-                save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
         if args.local_rank == 0:
             utils.makedirs(args.save)
             torch.save({
@@ -621,7 +612,8 @@ def main():
             # visualize samples and density
             if write_log:
                 with torch.no_grad():
-                    fig_filename = os.path.join(args.save, "figs", "{:04d}.jpg".format(epoch))
+                    fig_filename = os.path.join("/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example", "figs",
+                                                "{:04d}.jpg".format(epoch))
                     utils.makedirs(os.path.dirname(fig_filename))
                     generated_samples, _, _ = model(fixed_z, 1, reverse=True)
                     generated_samples = generated_samples.view(-1, *data_shape)
