@@ -212,7 +212,6 @@ class ODENVP(nn.Module):
         reg_states1 = reg_states
         reg_states2 = reg_states
         for idx in range(1, len(self.transforms)):
-
             x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx1, reg_states1)
             x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx2, reg_states2)
             if idx < len(self.transforms) - 1:
@@ -233,21 +232,68 @@ class ODENVP(nn.Module):
         return out, (_logpx1 + _logpx2) / 2.0, ((reg_states1[0] + reg_states2[0]) / 2.0,
                                                 (reg_states1[1] + reg_states2[1]) / 2.0)
 
-    def _generate(self, z, logpz=None, reg_states=tuple()):
+    def _generate_shared_model(self, z, logpz=None, reg_states=tuple()):
+        self.dims = [(6, 32, 32), (12, 16, 16), (24, 8, 8), (48, 4, 4), (48, 4, 4)]
+        self.dims_for_32 = [(6, 16, 16), (12, 8, 8), (24, 4, 4), (24, 4, 4)]
+        z = z.view(z.shape[0], 12, 32, 32)
+        split1, split2 = z[:, :6, :, :], z[:, 6:, :, :]
+
+        z1 = split1[:, :split1.shape[1] // 2]
+        z2 = split1[:, split1.shape[1] // 2:]
+
+        z_prev1, _logpz1, reg_states1 = self.do_one_pass(z1, self.dims_for_32, logpz, reg_states)
+        z_prev2, _logpz2, reg_states2 = self.do_one_pass(z2, self.dims_for_32, logpz, reg_states)
+        z_prev = torch.cat((z_prev1, z_prev2), dim=1)
+        _logpz = (_logpz1 + _logpz2) / 2.0
+        if len(reg_states1) > 0:
+            reg_states = (reg_states1 + reg_states2) / 2.0
+        else:
+            reg_states = ()
+        z_prev = torch.cat((z_prev, split2), dim=1)
+        z_prev, _logpz, reg_states = self.transforms[0](z_prev, _logpz, reg_states, reverse=True)
+        return z_prev, _logpz, reg_states
+
+    def do_one_pass(self, z, dims_, logpz=None, reg_states=()):
         z = z.view(z.shape[0], -1)
         zs = []
         i = 0
-        for dims in self.dims:
+        for idx, dims in enumerate(dims_):
             s = np.prod(dims)
             zs.append(z[:, i:i + s])
             i += s
-        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)]
+
+        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, dims_)]
         _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
         z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
-        for idx in range(len(self.transforms) - 2, -1, -1):
-            z_prev = torch.cat((z_prev, zs[idx]), dim=1)
+        counter = len(self.transforms) - 3
+        for idx in range(len(self.transforms) - 2, 0, -1):
+            z_prev = torch.cat((z_prev, zs[counter]), dim=1)
             z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
+            counter -= 1
         return z_prev, _logpz, reg_states
+
+    def _generate(self, z, logpz=None, reg_states=tuple()):
+        # for idx in range(len(self.transforms) - 2, -1, -1):
+        #    print(idx)
+        return self._generate_shared_model(z, logpz, reg_states)
+        # z = z.view(z.shape[0], -1)
+        #
+        # z1 = z[:, :z.shape[1] // 2]
+        # z2 = z[:, z.shape[1] // 2:]
+        #
+        # zs = []
+        # i = 0
+        # for idx, dims in enumerate(self.dims):
+        #     s = np.prod(dims)
+        #     zs.append(z[:, i:i + s])
+        #     i += s
+        # zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, self.dims)]
+        # _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
+        # z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
+        # for idx in range(len(self.transforms) - 2, -1, -1):
+        #     z_prev = torch.cat((z_prev, zs[idx]), dim=1)
+        #     z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
+        # return z_prev, _logpz, reg_states
 
 
 class StackedCNFLayers(layers.SequentialFlow):
