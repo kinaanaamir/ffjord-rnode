@@ -67,7 +67,7 @@ class ODENVP(nn.Module):
 
     def _load_complete_state_dict(self):
         state_dict = torch.load(
-            "/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example/intermediate.pth")["state_dict"]
+            "/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example/best.pth")["state_dict"]
         skip_index = len("transforms.")
         loaded_state_dict = {}
         for key in state_dict.keys():
