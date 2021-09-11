@@ -60,9 +60,9 @@ class ODENVP(nn.Module):
         if not self.n_scale > 0:
             raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
-        self.transforms = self._build_net_complete(input_size)
+        self.transforms, self.transforms1, self.transforms2 = self._build_net_complete(input_size)
         # self._load_weights()
-        self._load_complete_state_dict()
+        # self._load_complete_state_dict()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
     def _load_complete_state_dict(self):
@@ -102,6 +102,8 @@ class ODENVP(nn.Module):
     def _build_net_complete(self, input_size):
         bsz, c, h, w = input_size
         transforms = []
+        transforms1 = []
+        transforms2 = []
         transforms.append(
             StackedCNFLayers(
                 initial_size=(c, h, w),
@@ -120,7 +122,22 @@ class ODENVP(nn.Module):
         )
         c, h, w = c, h // 2, w // 2
         for i in range(self.n_scale):
-            transforms.append(
+            transforms1.append(
+                StackedCNFLayers(
+                    initial_size=(c, h, w),
+                    div_samples=self.div_samples,
+                    zero_last=self.zero_last,
+                    layer_type=self.layer_type,
+                    strides=self.strides,
+                    idims=self.intermediate_dims,
+                    squeeze=(i < self.n_scale - 1),  # don't squeeze last layer
+                    init_layer=None,
+                    n_blocks=self.n_blocks,
+                    cnf_kwargs=self.cnf_kwargs,
+                    nonlinearity=self.nonlinearity,
+                )
+            )
+            transforms2.append(
                 StackedCNFLayers(
                     initial_size=(c, h, w),
                     div_samples=self.div_samples,
@@ -136,7 +153,7 @@ class ODENVP(nn.Module):
                 )
             )
             c, h, w = c * 2, h // 2, w // 2
-        return nn.ModuleList(transforms)
+        return nn.ModuleList(transforms), nn.ModuleList(transforms1), nn.ModuleList(transforms2)
 
     def _build_net(self, input_size):
         _, c, h, w = input_size
@@ -202,7 +219,8 @@ class ODENVP(nn.Module):
         x, _logpx, reg_states = self.transforms[0].forward(x, _logpx, reg_states)
         d = x.size(1) // 2
         x, factor_out = x[:, :d], x[:, d:]
-        out = [factor_out]
+        out1 = [factor_out]
+        out2 = [factor_out]
         d = x.size(1) // 2
         x1, x2 = x[:, :d], x[:, d:]
         x1 = x1 * sharing_factor + image_2 * (1 - sharing_factor)
@@ -211,9 +229,9 @@ class ODENVP(nn.Module):
         _logpx2 = _logpx
         reg_states1 = reg_states
         reg_states2 = reg_states
-        for idx in range(1, len(self.transforms)):
-            x1, _logpx1, reg_states1 = self.transforms[idx].forward(x1, _logpx1, reg_states1)
-            x2, _logpx2, reg_states2 = self.transforms[idx].forward(x2, _logpx2, reg_states2)
+        for idx in range(0, len(self.transforms1)):
+            x1, _logpx1, reg_states1 = self.transforms1[idx].forward(x1, _logpx1, reg_states1)
+            x2, _logpx2, reg_states2 = self.transforms2[idx].forward(x2, _logpx2, reg_states2)
             if idx < len(self.transforms) - 1:
                 d = x1.size(1) // 2
                 x1, factor_out1 = x1[:, :d], x1[:, d:]
@@ -224,13 +242,17 @@ class ODENVP(nn.Module):
                 factor_out1 = x1
                 factor_out2 = x2
 
-            out.append(torch.cat((factor_out1, factor_out2), 1))
-        out = [o.view(o.size()[0], -1) for o in out]
-        out = torch.cat(out, 1)
+            out1.append(factor_out1)
+            out2.append(factor_out2)
+        out1 = [o.view(o.size()[0], -1) for o in out1]
+        out1 = torch.cat(out1, 1)
+
+        out2 = [o.view(o.size()[0], -1) for o in out2]
+        out2 = torch.cat(out2, 1)
+
         if len(reg_states1) == 0 or len(reg_states2) == 0:
-            return out, (_logpx1 + _logpx2) / 2.0, ()
-        return out, (_logpx1 + _logpx2) / 2.0, ((reg_states1[0] + reg_states2[0]) / 2.0,
-                                                (reg_states1[1] + reg_states2[1]) / 2.0)
+            return out1, out2, _logpx1, _logpx2, (), ()
+        return out1, out2, _logpx1, _logpx2, reg_states1, reg_states2
 
     def _generate_shared_model(self, z, logpz=None, reg_states=tuple()):
         self.dims = [(6, 32, 32), (12, 16, 16), (24, 8, 8), (48, 4, 4), (48, 4, 4)]

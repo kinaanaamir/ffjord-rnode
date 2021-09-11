@@ -269,11 +269,7 @@ def get_dataset(args):
     return train_loader, test_loader, data_shape
 
 
-def compute_bits_per_dim(x, sharing_factor, model):
-    zero = torch.zeros(x.shape[0], 1).to(x)
-
-    z, delta_logp, reg_states = model(x, sharing_factor, zero)  # run model forward
-
+def get_loss(z, delta_logp, reg_states):
     reg_states = tuple(torch.mean(rs) for rs in reg_states)
 
     logpz = standard_normal_logprob(z).view(z.shape[0], -1).sum(1, keepdim=True)  # logp(z)
@@ -285,7 +281,19 @@ def compute_bits_per_dim(x, sharing_factor, model):
         check = True
     bits_per_dim = -(torch.min(torch.zeros(1).cuda(), logpx_per_dim - np.log(nvals))) / np.log(2)
 
-    return bits_per_dim, (x, z), reg_states, check
+    return bits_per_dim, reg_states, check
+
+
+def compute_bits_per_dim(x, sharing_factor, model):
+    zero = torch.zeros(x.shape[0], 1).to(x)
+
+    z1, z2, delta_logp1, delta_logp2, reg_states1, reg_states2 = model(x, sharing_factor, zero)  # run model forward
+    bits_per_dim1, reg_states1, check1 = get_loss(z1, delta_logp1, reg_states1)
+    bits_per_dim2, reg_states2, check2 = get_loss(z2, delta_logp2, reg_states2)
+    bits_per_dim = bits_per_dim1 + bits_per_dim2
+
+    return bits_per_dim, (x, (z1+z2)/2), ((reg_states1[0] + reg_states2[0]) / 2.0,
+                                  (reg_states1[1] + reg_states2[1]) / 2.0), check1 | check2
 
 
 def create_model(args, data_shape, regularization_fns):
@@ -615,10 +623,10 @@ def main():
                     fig_filename = os.path.join("/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example", "figs",
                                                 "{:04d}.jpg".format(epoch))
                     utils.makedirs(os.path.dirname(fig_filename))
-                    generated_samples, _, _ = model(fixed_z, 1, reverse=True)
-                    generated_samples = generated_samples.view(-1, *data_shape)
-                    nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
-                    save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
+                    # generated_samples, _, _ = model(fixed_z, 1, reverse=True)
+                    # generated_samples = generated_samples.view(-1, *data_shape)
+                    # nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
+                    # save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
             if args.validate:
                 break
 
