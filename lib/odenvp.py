@@ -219,14 +219,17 @@ class ODENVP(nn.Module):
         x, _logpx, reg_states = self.transforms[0].forward(x, _logpx, reg_states)
         d = x.size(1) // 2
         x, factor_out = x[:, :d], x[:, d:]
-        out1 = [factor_out]
-        out2 = [factor_out]
+        out1 = []
+        out2 = []
         d = x.size(1) // 2
         x1, x2 = x[:, :d], x[:, d:]
         x1 = x1 * sharing_factor + image_2 * (1 - sharing_factor)
         x2 = x2 * sharing_factor + image_2 * (1 - sharing_factor)
         _logpx1 = _logpx
         _logpx2 = _logpx
+        first_layer_log_px = _logpx
+        first_layer_reg_states = reg_states
+        first_layer_factor_out = factor_out.view(factor_out.size()[0], -1)
         reg_states1 = reg_states
         reg_states2 = reg_states
         for idx in range(0, len(self.transforms1)):
@@ -252,7 +255,8 @@ class ODENVP(nn.Module):
 
         if len(reg_states1) == 0 or len(reg_states2) == 0:
             return out1, out2, _logpx1, _logpx2, (), ()
-        return out1, out2, _logpx1, _logpx2, reg_states1, reg_states2
+        return first_layer_factor_out, first_layer_log_px, first_layer_reg_states, \
+               out1, out2, _logpx1, _logpx2, reg_states1, reg_states2
 
     def _generate_shared_model(self, z, logpz=None, reg_states=tuple()):
         self.dims = [(6, 32, 32), (12, 16, 16), (24, 8, 8), (48, 4, 4), (48, 4, 4)]

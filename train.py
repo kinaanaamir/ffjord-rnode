@@ -189,7 +189,7 @@ def get_dataset(args):
     elif args.data == 'celebahq':
         im_dim = 3
         im_size = 64 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/",
+        train_set = CelebAHQ("/qHPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/",
                              transform=tforms.Compose([
                                  tforms.Resize(im_size),
                                  tforms.RandomHorizontalFlip(),
@@ -287,13 +287,15 @@ def get_loss(z, delta_logp, reg_states):
 def compute_bits_per_dim(x, sharing_factor, model):
     zero = torch.zeros(x.shape[0], 1).to(x)
 
-    z1, z2, delta_logp1, delta_logp2, reg_states1, reg_states2 = model(x, sharing_factor, zero)  # run model forward
+    first_layer_z, first_layer_delta_logp, first_layer_reg_states, z1, z2, delta_logp1, delta_logp2, reg_states1, reg_states2 = model(
+        x, sharing_factor, zero)  # run model forward
+    bits_per_dim0, reg_states, _ = get_loss(first_layer_z, first_layer_delta_logp, first_layer_reg_states)
     bits_per_dim1, reg_states1, check1 = get_loss(z1, delta_logp1, reg_states1)
     bits_per_dim2, reg_states2, check2 = get_loss(z2, delta_logp2, reg_states2)
-    bits_per_dim = bits_per_dim1 + bits_per_dim2
+    bits_per_dim = bits_per_dim0 + bits_per_dim1 + bits_per_dim2
 
-    return bits_per_dim, (x, (z1+z2)/2), ((reg_states1[0] + reg_states2[0]) / 2.0,
-                                  (reg_states1[1] + reg_states2[1]) / 2.0), check1 | check2
+    return bits_per_dim, (x, (z1 + z2) / 2), ((reg_states1[0] + reg_states2[0]) / 2.0,
+                                              (reg_states1[1] + reg_states2[1]) / 2.0), check1 | check2
 
 
 def create_model(args, data_shape, regularization_fns):
