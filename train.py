@@ -480,7 +480,7 @@ def main():
                             reg_state * coeff for reg_state, coeff in zip(reg_states, regularization_coeffs) if
                             coeff != 0
                         )
-                        loss = loss + reg_loss
+                        loss = loss + sum(reg_loss)
                     total_time = count_total_time(model)
 
                     loss.backward()
