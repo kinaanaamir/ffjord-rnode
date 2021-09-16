@@ -61,7 +61,7 @@ class ODENVP(nn.Module):
             raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
         self.transforms, self.transforms1, self.transforms2 = self._build_net_complete(input_size)
-        # self._load_weights()
+        #self._load_weights()
         # self._load_complete_state_dict()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
@@ -85,19 +85,25 @@ class ODENVP(nn.Module):
             number = str(int(key[skip_index]) + 1)
             loaded_state_dict[number + key[skip_index + 1:]] = state_dict[key]
         final_state_dict = {}
-        for key in self.transforms.state_dict().keys():
+        for key in self.transforms1.state_dict().keys():
             if key[0] == "0":
-                final_state_dict[key] = self.transforms.state_dict()[key]
+                final_state_dict[key] = self.transforms1.state_dict()[key]
             else:
                 try:
                     final_state_dict[key] = loaded_state_dict[key]
                 except:
                     continue
+        final_state_dict1 = final_state_dict
+        final_state_dict2 = final_state_dict
+        for key in self.transforms1.state_dict().keys():
+            if key not in final_state_dict1.keys():
+                final_state_dict1[key] = self.transforms1.state_dict()[key]
+        self.transforms1.load_state_dict(final_state_dict1)
 
-        for key in self.transforms.state_dict().keys():
-            if key not in final_state_dict.keys():
-                final_state_dict[key] = self.transforms.state_dict()[key]
-        self.transforms.load_state_dict(final_state_dict)
+        for key in self.transforms2.state_dict().keys():
+            if key not in final_state_dict2.keys():
+                final_state_dict2[key] = self.transforms2.state_dict()[key]
+        self.transforms2.load_state_dict(final_state_dict2)
 
     def _build_net_complete(self, input_size):
         bsz, c, h, w = input_size
@@ -235,7 +241,7 @@ class ODENVP(nn.Module):
         for idx in range(0, len(self.transforms1)):
             x1, _logpx1, reg_states1 = self.transforms1[idx].forward(x1, _logpx1, reg_states1)
             x2, _logpx2, reg_states2 = self.transforms2[idx].forward(x2, _logpx2, reg_states2)
-            if idx < len(self.transforms) - 1:
+            if idx < len(self.transforms1) - 1:
                 d = x1.size(1) // 2
                 x1, factor_out1 = x1[:, :d], x1[:, d:]
                 d = x2.size(1) // 2
@@ -253,8 +259,8 @@ class ODENVP(nn.Module):
         out2 = [o.view(o.size()[0], -1) for o in out2]
         out2 = torch.cat(out2, 1)
 
-        if len(reg_states1) == 0 or len(reg_states2) == 0:
-            return out1, out2, _logpx1, _logpx2, (), ()
+        #if len(reg_states1) == 0 or len(reg_states2) == 0:
+        #    return out1, out2, _logpx1, _logpx2, (), ()
         return first_layer_factor_out, first_layer_log_px, first_layer_reg_states, \
                out1, out2, _logpx1, _logpx2, reg_states1, reg_states2
 
