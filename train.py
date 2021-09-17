@@ -448,8 +448,6 @@ def main():
                 for i in range(number_of_batches):
                     x, label = next(iter(train_loader))
                     sharing_factor = 1.0
-                    if epoch < sharing_factors.shape[0]:
-                        sharing_factor = sharing_factors[sharing_factor_iterator]
                     start = time.time()
                     update_lr(optimizer, itr)
                     optimizer.zero_grad()
