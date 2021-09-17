@@ -502,6 +502,7 @@ def main():
                     wall_clock += itr_time
 
                     batch_size = x.size(0)
+                    reg_states = (reg_states[0][0], reg_states[1][0])
                     metrics = torch.tensor([1., batch_size,
                                             loss.item(),
                                             bpd.item(),
