@@ -512,7 +512,14 @@ def main():
 
                     total_gpus, batch_total, r_loss, r_bpd, r_nfe, r_grad_norm, *rv = dist_utils.sum_tensor(
                         metrics).cpu().numpy()
-
+                    if args.local_rank == 0 and itr == 810:
+                        utils.makedirs(args.save)
+                        torch.save({
+                            "args": args,
+                            "state_dict": model.state_dict() if torch.cuda.is_available() else model.state_dict(),
+                            "optim_state_dict": optimizer.state_dict(),
+                            "fixed_z": fixed_z.cpu()
+                        }, os.path.join(args.save, "intermediate.pth"))
                     if write_log:
                         time_meter.update(itr_time)
                         bpd_meter.update(r_bpd / total_gpus)
