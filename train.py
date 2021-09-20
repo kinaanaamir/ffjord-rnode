@@ -189,13 +189,13 @@ def get_dataset(args):
     elif args.data == 'celebahq':
         im_dim = 3
         im_size = 64 if args.imagesize is None else args.imagesize
-        train_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/training/",
+        train_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/training/",
                              transform=tforms.Compose([
                                  tforms.Resize(im_size),
                                  tforms.RandomHorizontalFlip(),
                              ])
                              )
-        test_set = CelebAHQ("/HPS/CNF/work/ffjord-rnode/data/CelebAMask-HQ/test/",
+        test_set = CelebAHQ("/home/kinaan/PycharmProjects/ffjord-rnode/data/CelebAMask-HQ/test/",
                             transform=tforms.Compose([
                                 tforms.Resize(im_size),
                             ])
@@ -360,7 +360,7 @@ def main():
 
     # build model
     regularization_fns, regularization_coeffs = create_regularization_fns(args)
-    model = create_model(args, data_shape, regularization_fns).cuda()
+    model = create_model(args, data_shape, regularization_fns)#.cuda()
     # model = create_model(args, data_shape, regularization_fns)
     args.distributed = False
     if args.distributed: model = dist_utils.DDP(model,
@@ -437,6 +437,7 @@ def main():
 
     length_of_trainloader = len(train_loader.dataset)
     sharing_factor_iterator = 0
+    args.validate = True
     for epoch in range(begin_epoch, args.num_epochs + 1):
         if not args.validate:
             model.train()
@@ -557,6 +558,15 @@ def main():
                             logger.info(log_message)
 
                     itr += 1
+        if write_log:
+            with torch.no_grad():
+                fig_filename = os.path.join("/home/kinaan/PycharmProjects/ffjord-rnode/experiments/celebahq/example", "figs",
+                                            "{:04d}.jpg".format(epoch))
+                utils.makedirs(os.path.dirname(fig_filename))
+                generated_samples, _, _ = model(fixed_z, 1, reverse=True)
+                generated_samples = generated_samples.view(-1, *data_shape)
+                nb = int(np.ceil(np.sqrt(float(fixed_z.size(0)))))
+                save_image(unshift(generated_samples, nbits=args.nbits), fig_filename, nrow=nb)
         sharing_factor_iterator += 1
         # compute test loss
         model.eval()

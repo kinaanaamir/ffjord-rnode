@@ -61,19 +61,35 @@ class ODENVP(nn.Module):
             raise ValueError('Could not compute number of scales for input of' 'size (%d,%d,%d,%d)' % input_size)
 
         self.transforms, self.transforms1, self.transforms2 = self._build_net_complete(input_size)
-        #self._load_weights()
-        # self._load_complete_state_dict()
+        # self._load_weights()
+        self._load_complete_state_dict()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
     def _load_complete_state_dict(self):
         state_dict = torch.load(
-            "/HPS/CNF/work/ffjord-rnode/experiments/celebahq/example/best.pth")["state_dict"]
-        skip_index = len("transforms.")
-        loaded_state_dict = {}
+            "/home/kinaan/PycharmProjects/ffjord-rnode/experiments/celebahq/example/intermediate.pth",
+            map_location="cpu")["state_dict"]
+        check_index = len("transforms")
+
+        transforms0_weights = {}
+        transforms1_weights = {}
+        transforms2_weights = {}
         for key in state_dict.keys():
-            number = str(int(key[skip_index]))
-            loaded_state_dict[number + key[skip_index + 1:]] = state_dict[key]
-        self.transforms.load_state_dict(loaded_state_dict)
+            if key[check_index] == "1":
+                skip_index = len("transforms1.")
+                number = str(int(key[skip_index]))
+                transforms1_weights[number + key[skip_index + 1:]] = state_dict[key]
+            elif key[check_index] == "2":
+                skip_index = len("transforms2.")
+                number = str(int(key[skip_index]))
+                transforms2_weights[number + key[skip_index + 1:]] = state_dict[key]
+            else:
+                skip_index = len("transforms.")
+                number = str(int(key[skip_index]))
+                transforms0_weights[number + key[skip_index + 1:]] = state_dict[key]
+        self.transforms.load_state_dict(transforms0_weights)
+        self.transforms1.load_state_dict(transforms1_weights)
+        self.transforms2.load_state_dict(transforms2_weights)
 
     def _load_weights(self):
         state_dict = torch.load(
@@ -259,7 +275,7 @@ class ODENVP(nn.Module):
         out2 = [o.view(o.size()[0], -1) for o in out2]
         out2 = torch.cat(out2, 1)
 
-        #if len(reg_states1) == 0 or len(reg_states2) == 0:
+        # if len(reg_states1) == 0 or len(reg_states2) == 0:
         #    return out1, out2, _logpx1, _logpx2, (), ()
         return first_layer_factor_out, first_layer_log_px, first_layer_reg_states, \
                out1, out2, _logpx1, _logpx2, reg_states1, reg_states2
@@ -273,19 +289,19 @@ class ODENVP(nn.Module):
         z1 = split1[:, :split1.shape[1] // 2]
         z2 = split1[:, split1.shape[1] // 2:]
 
-        z_prev1, _logpz1, reg_states1 = self.do_one_pass(z1, self.dims_for_32, logpz, reg_states)
-        z_prev2, _logpz2, reg_states2 = self.do_one_pass(z2, self.dims_for_32, logpz, reg_states)
+        z_prev1, _logpz1, reg_states1 = self.do_one_pass_model1(z1, self.dims_for_32, logpz, reg_states)
+        z_prev2, _logpz2, reg_states2 = self.do_one_pass_model2(z2, self.dims_for_32, logpz, reg_states)
         z_prev = torch.cat((z_prev1, z_prev2), dim=1)
         _logpz = (_logpz1 + _logpz2) / 2.0
         if len(reg_states1) > 0:
-            reg_states = (reg_states1 + reg_states2) / 2.0
+            reg_states = ((reg_states1[0] + reg_states2[0]) / 2.0, (reg_states1[1] + reg_states2[1])/2.0)
         else:
             reg_states = ()
         z_prev = torch.cat((z_prev, split2), dim=1)
         z_prev, _logpz, reg_states = self.transforms[0](z_prev, _logpz, reg_states, reverse=True)
         return z_prev, _logpz, reg_states
 
-    def do_one_pass(self, z, dims_, logpz=None, reg_states=()):
+    def do_one_pass_model1(self, z, dims_, logpz=None, reg_states=()):
         z = z.view(z.shape[0], -1)
         zs = []
         i = 0
@@ -296,11 +312,30 @@ class ODENVP(nn.Module):
 
         zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, dims_)]
         _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
-        z_prev, _logpz, _ = self.transforms[-1](zs[-1], _logpz, reverse=True)
-        counter = len(self.transforms) - 3
-        for idx in range(len(self.transforms) - 2, 0, -1):
+        z_prev, _logpz, _ = self.transforms1[-1](zs[-1], _logpz, reverse=True)
+        counter = len(self.transforms1) - 2
+        for idx in range(len(self.transforms1) - 2, 0, -1):
             z_prev = torch.cat((z_prev, zs[counter]), dim=1)
-            z_prev, _logpz, reg_states = self.transforms[idx](z_prev, _logpz, reg_states, reverse=True)
+            z_prev, _logpz, reg_states = self.transforms1[idx](z_prev, _logpz, reg_states, reverse=True)
+            counter -= 1
+        return z_prev, _logpz, reg_states
+
+    def do_one_pass_model2(self, z, dims_, logpz=None, reg_states=()):
+        z = z.view(z.shape[0], -1)
+        zs = []
+        i = 0
+        for idx, dims in enumerate(dims_):
+            s = np.prod(dims)
+            zs.append(z[:, i:i + s])
+            i += s
+
+        zs = [_z.view(_z.size()[0], *zsize) for _z, zsize in zip(zs, dims_)]
+        _logpz = torch.zeros(zs[0].shape[0], 1).to(zs[0]) if logpz is None else logpz
+        z_prev, _logpz, _ = self.transforms2[-1](zs[-1], _logpz, reverse=True)
+        counter = len(self.transforms2) - 2
+        for idx in range(len(self.transforms2) - 2, 0, -1):
+            z_prev = torch.cat((z_prev, zs[counter]), dim=1)
+            z_prev, _logpz, reg_states = self.transforms2[idx](z_prev, _logpz, reg_states, reverse=True)
             counter -= 1
         return z_prev, _logpz, reg_states
 
