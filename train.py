@@ -43,7 +43,7 @@ def get_parser():
                         type=str, default="mnist")
     parser.add_argument("--dims", type=str, default="64,64,64")
     parser.add_argument("--strides", type=str, default="1,1,1,1")
-    parser.add_argument("--num_blocks", type=int, default=2, help='Number of stacked CNFs.')
+    parser.add_argument("--num_blocks", type=int, default=4, help='Number of stacked CNFs.')
 
     parser.add_argument(
         "--layer_type", type=str, default="concat",
@@ -306,7 +306,7 @@ def create_model(args, data_shape, regularization_fns):
 
     model = odenvp.ODENVP(
         (args.batch_size, *data_shape),
-        n_blocks=args.num_blocks,
+        n_blocks=4,
         intermediate_dims=hidden_dims,
         div_samples=args.div_samples,
         strides=strides,
