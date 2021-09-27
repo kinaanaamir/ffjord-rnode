@@ -62,7 +62,7 @@ class ODENVP(nn.Module):
 
         self.transforms = self._build_net_complete(input_size)
         # self._load_weights()
-        self._load_complete_state_dict()
+        #self._load_complete_state_dict()
         self.dims = [o[1:] for o in self.calc_output_size(input_size)]
 
     def _load_complete_state_dict(self):
