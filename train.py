@@ -486,7 +486,7 @@ def main():
                     nfe_opt = count_nfe(model)
                     if write_log: steps_meter.update(nfe_opt)
                     grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
-                    if itr == 600 and args.local_rank == 0:
+                    if itr % 200 == 0 and args.local_rank == 0:
                         utils.makedirs(args.save)
                         torch.save({
                             "args": args,
